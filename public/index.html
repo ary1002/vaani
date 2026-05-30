@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vaani</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #09090f;
+      --surface:   #111118;
+      --border:    #1c1c28;
+      --text:      #e2e8f0;
+      --muted:     #4b5563;
+      --sub:       #6b7280;
+
+      --c-idle:      #334155;
+      --c-listen:    #3b82f6;
+      --c-think:     #a855f7;
+      --c-speak:     #10b981;
+      --c-error:     #ef4444;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .logo em { font-style: normal; color: var(--c-listen); }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    select {
+      font-family: inherit;
+      font-size: 0.72rem;
+      background: var(--surface);
+      color: var(--sub);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 9px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:hover { border-color: var(--muted); }
+    select:disabled { opacity: 0.4; cursor: default; }
+
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--sub);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 11px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .dot.live {
+      background: var(--c-speak);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+
+    /* ── Orb ─────────────────────────────────────────────────────────────── */
+    .stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px;
+      min-height: 0;
+    }
+
+    .orb-wrap {
+      position: relative;
+      width: 130px;
+      height: 130px;
+    }
+
+    /* Ripple rings */
+    .ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      opacity: 0;
+    }
+
+    .orb {
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      background: var(--c-idle);
+      transition: background 0.5s ease;
+    }
+
+    /* idle — gentle breathe */
+    .s-idle .orb {
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    /* listening — ripple + blue */
+    .s-listening .orb   { background: var(--c-listen); animation: breathe 1s ease-in-out infinite; }
+    .s-listening .ring  { animation: ripple 1.4s ease-out infinite; background: var(--c-listen); }
+
+    /* thinking — purple shimmer */
+    .s-thinking .orb {
+      background: var(--c-think);
+      animation: shimmer 1.2s linear infinite;
+    }
+
+    /* speaking — green bounce + ripple */
+    .s-speaking .orb   { background: var(--c-speak); animation: bounce 0.6s ease-in-out infinite alternate; }
+    .s-speaking .ring  { animation: ripple 0.9s ease-out infinite; background: var(--c-speak); }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%       { transform: scale(1.06); opacity: 0.85; }
+    }
+    @keyframes ripple {
+      0%   { transform: scale(0.8);  opacity: 0.5; }
+      100% { transform: scale(1.75); opacity: 0; }
+    }
+    @keyframes shimmer {
+      0%   { box-shadow: 4px  0   20px rgba(168, 85, 247, 0.6); }
+      25%  { box-shadow: 0    4px 20px rgba(168, 85, 247, 0.6); }
+      50%  { box-shadow: -4px 0   20px rgba(168, 85, 247, 0.6); }
+      75%  { box-shadow: 0   -4px 20px rgba(168, 85, 247, 0.6); }
+      100% { box-shadow: 4px  0   20px rgba(168, 85, 247, 0.6); }
+    }
+    @keyframes bounce {
+      from { transform: scale(1); }
+      to   { transform: scale(1.1); }
+    }
+
+    .stage-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      transition: color 0.3s;
+      height: 18px;
+      text-transform: uppercase;
+    }
+    .s-listening .stage-label { color: var(--c-listen); }
+    .s-thinking  .stage-label { color: var(--c-think);  }
+    .s-speaking  .stage-label { color: var(--c-speak);  }
+
+    /* ── Conversation ─────────────────────────────────────────────────────── */
+    .convo {
+      flex-shrink: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scroll-behavior: smooth;
+    }
+
+    .convo:empty::after {
+      content: 'Start a conversation — tap Connect';
+      display: block;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 8px 0;
+    }
+
+    .bubble {
+      max-width: 72%;
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 0.84rem;
+      line-height: 1.55;
+      animation: slideUp 0.18s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble-user {
+      align-self: flex-end;
+      background: #1e293b;
+      color: var(--text);
+      border-bottom-right-radius: 3px;
+    }
+    .bubble-user.partial { opacity: 0.55; font-style: italic; }
+
+    .bubble-agent {
+      align-self: flex-start;
+      background: #0f2027;
+      color: #7dd3fc;
+      border-bottom-left-radius: 3px;
+    }
+
+    /* Typing dots */
+    .dots { display: flex; gap: 4px; align-items: center; height: 18px; }
+    .dots span {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--c-think);
+      animation: dotBlink 1.2s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotBlink {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%           { transform: scale(1);   opacity: 1; }
+    }
+
+    /* Waveform bars */
+    .wave { display: flex; gap: 3px; align-items: center; height: 20px; }
+    .wave span {
+      display: block;
+      width: 3px;
+      background: var(--c-speak);
+      border-radius: 2px;
+      animation: bar 0.7s ease-in-out infinite alternate;
+    }
+    .wave span:nth-child(1) { height: 8px;  animation-delay: 0s;    }
+    .wave span:nth-child(2) { height: 18px; animation-delay: 0.1s;  }
+    .wave span:nth-child(3) { height: 12px; animation-delay: 0.2s;  }
+    .wave span:nth-child(4) { height: 20px; animation-delay: 0.15s; }
+    .wave span:nth-child(5) { height: 10px; animation-delay: 0.05s; }
+    .wave span:nth-child(6) { height: 16px; animation-delay: 0.25s; }
+    @keyframes bar {
+      from { transform: scaleY(0.3); opacity: 0.6; }
+      to   { transform: scaleY(1);   opacity: 1; }
+    }
+
+    .convo::-webkit-scrollbar       { width: 3px; }
+    .convo::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Agent streaming text + blinking cursor */
+    .agent-text::after {
+      content: '▋';
+      animation: blink 0.7s step-end infinite;
+      opacity: 0.6;
+      margin-left: 1px;
+    }
+    .agent-text.done::after { display: none; }
+    @keyframes blink { 0%, 100% { opacity: 0.6; } 50% { opacity: 0; } }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      flex-shrink: 0;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 0;
+      cursor: pointer;
+      outline: none;
+      transition: background 0.15s, opacity 0.15s, transform 0.1s;
+    }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button:disabled { opacity: 0.35; cursor: default; }
+
+    #connectBtn {
+      flex: 1;
+      background: var(--c-listen);
+      color: #fff;
+    }
+    #connectBtn:hover:not(:disabled) { background: #2563eb; }
+    #connectBtn.connected {
+      background: #1e293b;
+      color: var(--sub);
+      border: 1px solid var(--border);
+    }
+    #connectBtn.connected:hover { background: #273549; }
+
+    #interruptBtn {
+      width: 44px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--sub);
+      font-size: 1rem;
+    }
+    #interruptBtn:hover:not(:disabled) {
+      border-color: var(--c-think);
+      color: var(--c-think);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">vaa<em>n</em>i</div>
+  <div class="header-right">
+    <select id="lang">
+      <option value="english">English</option>
+      <option value="hindi">हिंदी</option>
+      <option value="hinglish">Hinglish</option>
+    </select>
+    <div class="pill">
+      <div class="dot" id="dot"></div>
+      <span id="statusLabel">disconnected</span>
+    </div>
+  </div>
+</header>
+
+<div class="stage s-idle" id="stage">
+  <div class="orb-wrap">
+    <div class="ring"></div>
+    <div class="orb"></div>
+  </div>
+  <div class="stage-label" id="stageLabel">Connect to start</div>
+</div>
+
+<div class="convo" id="convo"></div>
+
+<footer>
+  <button id="connectBtn">Connect</button>
+  <button id="interruptBtn" disabled title="Interrupt (Space)">⚡</button>
+</footer>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const WS_URL        = 'ws://localhost:3000/ws';
+const CAPTURE_RATE  = 16000;   // Hz — Deepgram expects 16kHz
+const TTS_RATE = 24000; // sample rate of ElevenLabs pcm_24000 buffers
+const CHUNK_MS      = 100;     // audio_chunk interval
+
+// ── Inline AudioWorklet (avoids a separate file) ─────────────────────────────
+const WORKLET_SRC = `
+class PCMProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._buf = [];
+    this._sz  = ${CAPTURE_RATE * CHUNK_MS / 1000};
+  }
+  process(inputs) {
+    const ch = inputs[0]?.[0];
+    if (ch) for (const s of ch) this._buf.push(s);
+    while (this._buf.length >= this._sz) {
+      const slice = this._buf.splice(0, this._sz);
+      const i16   = new Int16Array(slice.length);
+      for (let i = 0; i < slice.length; i++)
+        i16[i] = Math.max(-32768, Math.min(32767, slice[i] * 32767 | 0));
+      this.port.postMessage(i16.buffer, [i16.buffer]);
+    }
+    return true;
+  }
+}
+registerProcessor('pcm', PCMProcessor);
+`;
+
+// ── App state ────────────────────────────────────────────────────────────────
+let ws          = null;
+let sessionId   = null;
+let capCtx      = null;   // capture AudioContext
+let worklet     = null;
+let micStream   = null;
+let pbCtx       = null;   // playback AudioContext
+let pbGain      = null;
+let pbTime      = 0;
+
+let state       = 'disconnected';
+
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const stage       = document.getElementById('stage');
+const stageLabel  = document.getElementById('stageLabel');
+const dot         = document.getElementById('dot');
+const statusLabel = document.getElementById('statusLabel');
+const connectBtn  = document.getElementById('connectBtn');
+const interruptBtn= document.getElementById('interruptBtn');
+const convo       = document.getElementById('convo');
+const langSel     = document.getElementById('lang');
+
+// ── State transitions ─────────────────────────────────────────────────────────
+const STATE_LABELS = {
+  disconnected: 'Connect to start',
+  idle:         'Listening…',
+  listening:    'Listening…',
+  thinking:     'Thinking…',
+  speaking:     'Speaking…',
+};
+
+function applyState(s) {
+  state = s;
+  stage.className = `stage s-${s}`;
+  stageLabel.textContent = STATE_LABELS[s] ?? s;
+  interruptBtn.disabled  = (s === 'disconnected' || s === 'idle');
+}
+
+function applyConnected(yes) {
+  dot.className         = 'dot' + (yes ? ' live' : '');
+  statusLabel.textContent = yes ? 'connected' : 'disconnected';
+  connectBtn.textContent  = yes ? 'Disconnect' : 'Connect';
+  connectBtn.className    = yes ? 'connected'  : '';
+  langSel.disabled        = yes;
+}
+
+// ── Conversation bubbles ──────────────────────────────────────────────────────
+let userBubble  = null;  // current partial user bubble element
+let agentBubble = null;  // current agent bubble element
+let agentTextEl = null;  // the <span class="agent-text"> currently accumulating tokens
+
+function scrollBottom() {
+  convo.scrollTop = convo.scrollHeight;
+}
+
+function makeBubble(role) {
+  const el = document.createElement('div');
+  el.className = `bubble bubble-${role}`;
+  convo.appendChild(el);
+  scrollBottom();
+  return el;
+}
+
+function onPartial(text) {
+  if (!userBubble) userBubble = makeBubble('user');
+  userBubble.textContent = text;
+  userBubble.classList.add('partial');
+  scrollBottom();
+}
+
+function onFinal(text) {
+  if (userBubble) {
+    userBubble.textContent = text;
+    userBubble.classList.remove('partial');
+    userBubble = null;
+  } else {
+    makeBubble('user').textContent = text;
+  }
+  // Show agent "thinking" indicator
+  agentBubble = makeBubble('agent');
+  agentBubble.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+  scrollBottom();
+}
+
+function onFirstAudio() {
+  if (!agentBubble) agentBubble = makeBubble('agent');
+  // If text is already streaming in, keep it — audio plays in background
+  if (agentBubble.querySelector('.agent-text')) return;
+  agentBubble.innerHTML =
+    '<div class="wave">' +
+    '<span></span><span></span><span></span><span></span><span></span><span></span>' +
+    '</div>';
+  scrollBottom();
+}
+
+function onTurnDone() {
+  if (agentBubble) {
+    if (agentTextEl) {
+      agentTextEl.classList.add('done');
+    } else {
+      agentBubble.innerHTML = '<span style="opacity:0.4;font-size:0.78rem">▸ played audio</span>';
+    }
+    agentBubble = null;
+  }
+  agentTextEl = null;
+  userBubble = null;
+}
+
+function clearConvo() {
+  convo.innerHTML = '';
+  userBubble = agentBubble = agentTextEl = null;
+}
+
+function addError(msg) {
+  const el = document.createElement('div');
+  el.style.cssText = 'font-size:0.78rem;color:#f87171;text-align:center;padding:4px 0';
+  el.textContent = '⚠ ' + msg;
+  convo.appendChild(el);
+  scrollBottom();
+}
+
+// ── Base64 helpers ────────────────────────────────────────────────────────────
+function enc(buf) {
+  let s = '';
+  const b = new Uint8Array(buf);
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+
+function dec(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return new Int16Array(out.buffer);
+}
+
+// ── Capture ───────────────────────────────────────────────────────────────────
+async function startCapture() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, sampleRate: CAPTURE_RATE,
+             echoCancellation: true, noiseSuppression: true }
+  });
+
+  capCtx = new AudioContext({ sampleRate: CAPTURE_RATE });
+  const blob = new Blob([WORKLET_SRC], { type: 'application/javascript' });
+  const url  = URL.createObjectURL(blob);
+  await capCtx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+
+  const src = capCtx.createMediaStreamSource(micStream);
+  worklet = new AudioWorkletNode(capCtx, 'pcm');
+  worklet.port.onmessage = ({ data }) => {
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'audio_chunk', data: enc(data), sampleRate: CAPTURE_RATE }));
+  };
+  src.connect(worklet);
+  // intentionally not connected to destination — no mic echo
+}
+
+function stopCapture() {
+  worklet?.disconnect();
+  worklet = null;
+  micStream?.getTracks().forEach(t => t.stop());
+  micStream = null;
+  capCtx?.close().catch(() => {});
+  capCtx = null;
+}
+
+// ── Playback ──────────────────────────────────────────────────────────────────
+function initPlayback() {
+  // No sampleRate override — let the browser use the hardware-native rate
+  // (44100 or 48000 Hz). Forcing 24000 Hz causes the OS to resample at lower
+  // quality on Linux PulseAudio, which is what makes audio sound too fast/tinny.
+  pbCtx  = new AudioContext();
+  pbGain = pbCtx.createGain();
+  pbGain.connect(pbCtx.destination);
+  pbTime = 0;
+}
+
+let firstAudio = true;
+function enqueue(i16) {
+  if (!pbCtx) return;
+  // Resume in case the AudioContext was suspended (autoplay policy on Linux/Firefox).
+  if (pbCtx.state === 'suspended') pbCtx.resume();
+  if (firstAudio) { onFirstAudio(); firstAudio = false; }
+
+  const f32 = new Float32Array(i16.length);
+  for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / 32768;
+  // Specify TTS_RATE (24000) so Web Audio knows the source rate and resamples
+  // correctly to whatever rate the AudioContext is actually running at.
+  const buf = pbCtx.createBuffer(1, f32.length, TTS_RATE);
+  buf.copyToChannel(f32, 0);
+  const src = pbCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(pbGain);
+  const t = Math.max(pbTime, pbCtx.currentTime + 0.02);
+  src.start(t);
+  pbTime = t + buf.duration;
+}
+
+function flushPlayback() {
+  if (!pbGain) return;
+  pbGain.gain.setValueAtTime(0, pbCtx.currentTime);
+  pbGain.gain.linearRampToValueAtTime(1, pbCtx.currentTime + 0.06);
+  pbTime = pbCtx.currentTime;
+}
+
+function stopPlayback() {
+  pbCtx?.close().catch(() => {});
+  pbCtx = pbGain = null;
+  pbTime = 0;
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'transcript_partial':
+      applyState('listening');
+      onPartial(msg.text);
+      break;
+
+    case 'transcript_final':
+      applyState('thinking');
+      firstAudio = true;
+      onFinal(msg.text);
+      break;
+
+    case 'agent_text_delta':
+      if (!agentBubble) {
+        agentBubble = makeBubble('agent');
+      }
+      if (!agentTextEl) {
+        agentBubble.innerHTML = ''; // clear dots if present
+        agentTextEl = document.createElement('span');
+        agentTextEl.className = 'agent-text';
+        agentBubble.appendChild(agentTextEl);
+      }
+      agentTextEl.textContent += msg.text;
+      scrollBottom();
+      break;
+
+    case 'audio_out':
+      applyState('speaking');
+      enqueue(dec(msg.data));
+      break;
+
+    case 'turn_complete':
+      applyState('idle');
+      onTurnDone();
+      break;
+
+    case 'error':
+      addError(`[${msg.code}] ${msg.message}`);
+      applyState('idle');
+      break;
+  }
+}
+
+async function connect() {
+  sessionId = crypto.randomUUID();
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = async () => {
+    ws.send(JSON.stringify({ type: 'start_session', sessionId, language: langSel.value }));
+    try {
+      await startCapture();
+      initPlayback();
+      applyConnected(true);
+      applyState('idle');
+    } catch (e) {
+      addError('Mic access denied — ' + (e.message ?? e));
+      disconnect();
+    }
+  };
+
+  ws.onmessage = ({ data }) => {
+    try { handleMessage(JSON.parse(data)); } catch {}
+  };
+
+  ws.onclose = () => {
+    stopCapture();
+    stopPlayback();
+    applyConnected(false);
+    applyState('disconnected');
+    ws = sessionId = null;
+  };
+
+  ws.onerror = () => {
+    addError('Cannot reach server — run: npm run dev');
+  };
+}
+
+function disconnect() {
+  if (!ws) return;
+  try { ws.send(JSON.stringify({ type: 'end_session', sessionId })); } catch {}
+  ws.close();
+}
+
+function interrupt() {
+  if (!ws || !sessionId) return;
+  ws.send(JSON.stringify({ type: 'interrupt', sessionId }));
+  flushPlayback();
+  applyState('idle');
+  if (agentBubble) { agentBubble.remove(); agentBubble = null; }
+  agentTextEl = null;
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+connectBtn.addEventListener('click',   () => ws ? disconnect() : connect());
+interruptBtn.addEventListener('click', interrupt);
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    if (state === 'speaking') interrupt();
+    else if (!ws) connect();
+  }
+});
+</script>
+</body>
+</html>
